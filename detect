@@ -1,0 +1,108 @@
+
+###################################################################
+#                                                                 #
+#   ROOTKIT DETECTOR                                              #
+#   UNSW COMP6448 2019tX (01/2019-02/2019)                        #
+#                                                                 #
+#   The below program has been written by the students            #
+#   of the COMP6448 - Security Masterclass course in              #
+#   the Jan/Feb of 2019 Summer Term.                              #
+#                                                                 #
+#   This program draws from student detectors submitted           #
+#   in 2018s2 COMP6447 - System and Software Security Assessment  #
+#                                                                 #
+###################################################################
+
+#!/bin/sh
+
+split="--------------------------------------------------------------------------------"
+detected=0
+# Print some info about the program: Stub
+echo "Verbose(0/1)?"
+read VERBOSE
+echo OK.
+ownership_info() {
+    echo "[*] Welcome to the COMP6448 Rootkit Detector"
+    echo "[*] Please enjoy your stay"
+    echo "[*] Verbose Mode Active: More output will be printed"
+    echo $split
+}
+
+# Notify Debugging: stub
+debug_info() {
+    echo "[*] Debug Mode Active: Technical output will be printed"
+    echo $split
+}
+
+# Stub
+is_rootkit() {
+    echo "[*] Scan complete: Rootkit Detected"
+}
+
+# Stub
+is_not_rootkit() {
+    echo "[*] Scan complete: No Rootkit Detected"
+}
+
+# Compile needed programs in /src
+compile() {
+    cc -lkvm ./src/hook_detect.c -o ./src/hook_detect
+}
+
+
+if [ $VERBOSE -eq 1 ]
+then
+    ownership_info
+fi
+if [ $DEBUG -eq 1 ] 
+then
+    debug_info
+fi
+
+# Step 0: Compile
+compile
+
+
+# Step 1: Load kernel Module
+# On Load, KM adds a syscall which will do most of our scanning
+echo
+echo "[*] Attempting to Load Kernel module..."
+kldload src/detector.ko || exit; 
+echo "[*] Kernel Module Load succeeded"
+
+
+# set var as the syscall num of the detector's syscall
+var=`dmesg | tail -n 1 | sed s/\[^0-9\]\*//g`
+echo $split
+
+
+# run program executes syscall($var)
+echo "[*] Executing syscall..."
+./src/run $var || detected=1
+echo "[*] Syscall Complete"
+echo $split
+
+
+# Hook Detection searches for simple function hooks 
+#  that are achieved by manipulating sysent[]
+if [ $VERBOSE -eq 1 ]
+then
+    ./src/hook_detect $var | grep HOOK_CHECK
+else
+    ./src/hook_detect $var | grep HOOK_CHECK_FOUND && detected=1
+fi
+echo "[*] Hook_detect returned $val"
+echo $split
+
+
+# Scan Finished, Unload Kernel Module
+echo "[*] Unloading Kernel Module..."
+kldunload detector
+echo $split
+
+if [$detected -eq 1]
+then
+    is_rootkit
+else
+    is_not_rootkit
+fi
